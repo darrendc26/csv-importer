@@ -1,0 +1,28 @@
+services:
+  # Backend Service (Node.js/TypeScript Express App)
+  - type: web
+    name: groweasy-importer-backend
+    env: docker
+    dockerContext: ./backend
+    dockerfilePath: Dockerfile
+    plan: free
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: GEMINI_API_KEY
+        sync: false # Render will prompt the user to input this key during deployment
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+
+  # Frontend Service (Next.js App)
+  - type: web
+    name: groweasy-importer-frontend
+    env: docker
+    dockerContext: ./frontend
+    dockerfilePath: Dockerfile
+    plan: free
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: NEXT_PUBLIC_API_URL
+        value: https://groweasy-importer-backend.onrender.com # Change this if using a custom backend domain
