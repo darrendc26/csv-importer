@@ -1,0 +1,11 @@
+Full Name,E-mail Address,Phone Number,Company,Job Title,EstValue,Status,Comments
+John Doe,john.doe@google.com,+15551234567,Google Inc.,vp sales,10k,Active,Wants to schedule demo
+Jane Smith,jane@stripe.com,555-987-6543,Stripe,Senior Dev,5000,New,Referred by VP
+Messy Lead,messy.email.com,1234567890,,software engineer II,$2,500,,Should fail email validation
+Bob Vance,,+1 (555) 777-8888,Vance Refrigeration,CEO,20000,Qualified,Missing email skip test
+"Alice Cooper","alice@cooper.net",(555) 999-1111,"Cooper & Sons",lead designer,750,Unqualified,Enrichment test
+Charlie Brown,charlie.brown@netflix.com,555-222-3333,Netflix,Director of Product,15k,New,Interested in enterprise plan
+David Miller,david.miller@gmail.com,555-444-5555,Miller Tech,Founder,50k,Qualified,Needs follow-up next Monday
+Emma Watson,emma.watson@bbc.co.uk,+44 20 7946 0192,BBC,Lead Producer,3000,Contacted,UK based client
+Frank Castle,frank.castle@marvel.com,111-222-3333,Marvel,Security Chief,150,000.50,New,High value prospect
+Grace Hopper,grace.hopper@navy.mil,999-888-7777,US Navy,Rear Admiral,1M,Qualified,Pioneering computer scientist

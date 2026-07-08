@@ -1,0 +1,19 @@
+# Dependency directories
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Build outputs
+backend/dist/
+frontend/.next/
+
+# Environment files (Secrets)
+.env
+.env.local
+backend/.env
+
+# System / logs
+*.log
+.DS_Store
+.next/
+dist/
