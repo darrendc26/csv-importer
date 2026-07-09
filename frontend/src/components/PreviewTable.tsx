@@ -227,8 +227,7 @@ export default function PreviewTable({
                   textAlign: 'left',
                   position: 'absolute',
                   top: 0,
-                  left: 0,
-                  transform: `translateY(${offsetY}px)`
+                  left: 0
                 }}
               >
                 <thead>
@@ -244,7 +243,7 @@ export default function PreviewTable({
                     ))}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody style={{ transform: `translateY(${offsetY}px)` }}>
                   {visibleRows.map((row, idx) => {
                     const originalIdx = startIndex + idx;
                     return (

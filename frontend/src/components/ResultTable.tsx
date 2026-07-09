@@ -316,8 +316,7 @@ export default function ResultTable({ result, onReset }: ResultTableProps) {
                       textAlign: 'left',
                       position: 'absolute',
                       top: 0,
-                      left: 0,
-                      transform: `translateY(${successVirtual.offsetY}px)`
+                      left: 0
                     }}
                   >
                     <thead>
@@ -339,7 +338,7 @@ export default function ResultTable({ result, onReset }: ResultTableProps) {
                         <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>description</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody style={{ transform: `translateY(${successVirtual.offsetY}px)` }}>
                       {visibleSuccessLeads.map((lead, idx) => {
                         const originalIdx = successVirtual.startIndex + idx;
                         return (
@@ -440,8 +439,7 @@ export default function ResultTable({ result, onReset }: ResultTableProps) {
                       textAlign: 'left',
                       position: 'absolute',
                       top: 0,
-                      left: 0,
-                      transform: `translateY(${skippedVirtual.offsetY}px)`
+                      left: 0
                     }}
                   >
                     <thead>
@@ -454,7 +452,7 @@ export default function ResultTable({ result, onReset }: ResultTableProps) {
                         <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Raw Details</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody style={{ transform: `translateY(${skippedVirtual.offsetY}px)` }}>
                       {visibleSkippedRecords.map((item, idx) => {
                         const originalIdx = skippedVirtual.startIndex + idx;
                         return (
