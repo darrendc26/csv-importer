@@ -114,3 +114,75 @@ We have provided two sample files in the root folder to help you test the import
 *   **Skip Criteria:** Any record with neither a valid email nor a valid mobile number is automatically skipped.
 *   **Multi-value Processing:** The first email/mobile goes to its field; any subsequent values are appended to `crm_note`.
 *   **Date Format:** `created_at` is cleaned and validated to a JS-parseable string format (`YYYY-MM-DD HH:MM:SS`). If missing/unmapped, it is programmatically stamped with the current import time.
+
+---
+
+## Deployment on Koyeb
+
+This project is fully ready to deploy on **Koyeb** using the pre-configured Dockerfiles.
+
+### Step 1: Deploy the Backend
+1. Go to the [Koyeb Console](https://app.koyeb.com/) and click **Create Service**.
+2. Select your GitHub repository.
+3. In the builder settings:
+   * **Builder:** `Dockerfile`
+   * **Dockerfile path:** `backend/Dockerfile`
+   * **Build context directory:** `backend`
+4. In the service settings:
+   * **Port:** `3000` (HTTP)
+   * **Path:** `/`
+5. Add the following **Environment Variables**:
+   * `PORT` = `3000`
+   * `GEMINI_API_KEY` = *[Your Google Gemini API Key]*
+   * `NODE_ENV` = `production`
+6. Click **Deploy**. Note down your backend URL (e.g., `https://<your-app>-<id>.koyeb.app`).
+
+### Step 2: Deploy the Frontend
+1. Click **Create Service** in your Koyeb app again.
+2. Select the same GitHub repository.
+3. In the builder settings:
+   * **Builder:** `Dockerfile`
+   * **Dockerfile path:** `frontend/Dockerfile`
+   * **Build context directory:** `frontend`
+4. In the service settings:
+   * **Port:** `3001` (HTTP)
+   * **Path:** `/`
+5. Add the following **Environment Variables**:
+   * `PORT` = `3001`
+   * `NEXT_PUBLIC_API_URL` = *[Your public Koyeb Backend URL from Step 1]*
+   * `NODE_ENV` = `production`
+6. Click **Deploy**. Your CSV Importer is now live!
+
+---
+
+## Deployment on Render
+
+You can also deploy this application to **Render** as Web Services using Docker.
+
+### Step 1: Deploy the Backend (Web Service)
+1. Go to the [Render Dashboard](https://dashboard.render.com/) and click **New > Web Service**.
+2. Connect your GitHub repository.
+3. In the settings:
+   * **Name:** `groweasy-csv-importer-backend`
+   * **Runtime:** `Docker`
+   * **Root Directory:** `backend` (crucial for monorepos)
+4. Add the following **Environment Variables** in the "Environment" tab:
+   * `PORT` = `3000`
+   * `GEMINI_API_KEY` = *[Your Google Gemini API Key]*
+   * `NODE_ENV` = `production`
+5. Click **Create Web Service**. Note down the URL Render provides for your backend (e.g., `https://groweasy-csv-importer-backend.onrender.com`).
+
+### Step 2: Deploy the Frontend (Web Service)
+1. Click **New > Web Service** again.
+2. Connect the same GitHub repository.
+3. In the settings:
+   * **Name:** `groweasy-csv-importer-frontend`
+   * **Runtime:** `Docker`
+   * **Root Directory:** `frontend`
+4. Add the following **Environment Variables**:
+   * `PORT` = `3001`
+   * `NEXT_PUBLIC_API_URL` = *[Your public Render Backend URL from Step 1]*
+   * `NODE_ENV` = `production`
+5. Click **Create Web Service**. Once built, your app is live!
+
+
