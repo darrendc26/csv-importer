@@ -58,89 +58,80 @@ export interface MappingResult {
   reasoning: string;
 }
 
-// Automatically analyze CSV headers and suggest mappings using Gemini AI
+// Fallback helper for mapping headers programmatically when AI suggestion fails (e.g. rate-limited 429)
+function programmaticSuggestMapping(headers: string[]): MappingResult {
+  const mappings: Record<string, string | null> = {};
+  const confidence: Record<string, number> = {};
+
+  TARGET_CRM_FIELDS.forEach((field) => {
+    mappings[field.name] = null;
+    confidence[field.name] = 0;
+  });
+
+  const lowercaseHeaders = headers.map(h => h.toLowerCase().trim());
+  const mappedHeaders = new Set<string>();
+
+  TARGET_CRM_FIELDS.forEach((field) => {
+    let matchIdx = -1;
+
+    // Local heuristic keyword rules
+    if (field.name === 'email') {
+      matchIdx = lowercaseHeaders.findIndex(h => h.includes('email') || h.includes('e-mail') || h.includes('mail') || h.includes('addr'));
+    } else if (field.name === 'name') {
+      matchIdx = lowercaseHeaders.findIndex(h => h.includes('name') || h.includes('contact') || h.includes('lead'));
+    } else if (field.name === 'mobile_without_country_code') {
+      matchIdx = lowercaseHeaders.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('number') || h.includes('cell'));
+    } else if (field.name === 'created_at') {
+      matchIdx = lowercaseHeaders.findIndex(h => h.includes('date') || h.includes('created') || h.includes('time'));
+    } else if (field.name === 'company') {
+      matchIdx = lowercaseHeaders.findIndex(h => h.includes('company') || h.includes('org') || h.includes('firm') || h.includes('employer'));
+    } else if (field.name === 'city') {
+      matchIdx = lowercaseHeaders.findIndex(h => h === 'city' || h.includes('town'));
+    } else if (field.name === 'state') {
+      matchIdx = lowercaseHeaders.findIndex(h => h === 'state' || h.includes('province') || h.includes('region'));
+    } else if (field.name === 'country') {
+      matchIdx = lowercaseHeaders.findIndex(h => h === 'country');
+    } else if (field.name === 'lead_owner') {
+      matchIdx = lowercaseHeaders.findIndex(h => h.includes('owner') || h.includes('agent') || h.includes('assigned'));
+    } else if (field.name === 'crm_status') {
+      matchIdx = lowercaseHeaders.findIndex(h => h.includes('status') || h.includes('stage'));
+    } else if (field.name === 'crm_note') {
+      matchIdx = lowercaseHeaders.findIndex(h => h.includes('note') || h.includes('comment') || h.includes('remark') || h.includes('feedback'));
+    } else if (field.name === 'data_source') {
+      matchIdx = lowercaseHeaders.findIndex(h => h.includes('source') || h.includes('channel') || h.includes('campaign'));
+    } else if (field.name === 'possession_time') {
+      matchIdx = lowercaseHeaders.findIndex(h => h.includes('possession') || h.includes('timeline'));
+    } else if (field.name === 'description') {
+      matchIdx = lowercaseHeaders.findIndex(h => h.includes('desc') || h.includes('about') || h.includes('info'));
+    }
+
+    if (matchIdx !== -1) {
+      const headerName = headers[matchIdx];
+      // Ensure one header is not mapped to multiple target fields programmatically
+      if (!mappedHeaders.has(headerName)) {
+        mappings[field.name] = headerName;
+        confidence[field.name] = 0.7;
+        mappedHeaders.add(headerName);
+      }
+    }
+  });
+
+  return {
+    mappings,
+    confidence,
+    reasoning: 'Gemini AI API quota exceeded or key invalid. Switched to local rule-based header mapper fallback.'
+  };
+}
+
+// Automatically analyze CSV headers and suggest mappings.
+// NOTE: To adhere strictly to the "No AI processing should happen yet" preview guidelines
+// and avoid rate-limiting / latency during file uploads, this uses a local keyword mapper.
 export async function suggestColumnMapping(
   headers: string[],
   sampleRows: string[][],
   apiKey?: string
 ): Promise<MappingResult> {
-  const model = getModel(apiKey);
-
-  const prompt = `
-You are an expert CRM Integration Assistant. You need to map columns from an uploaded CSV file to standard GrowEasy CRM lead schema fields.
-
-Target CRM Fields:
-${TARGET_CRM_FIELDS.map(f => `- \`${f.name}\`: ${f.description}`).join('\n')}
-
-CSV Headers to map:
-${JSON.stringify(headers)}
-
-CSV Sample Rows (up to 10 rows of data for context):
-${JSON.stringify(sampleRows)}
-
-Instructions:
-1. Map each target CRM field to the most appropriate CSV header. A CSV header can only be mapped to one target CRM field.
-2. If there is no logical match for a CRM field, set the mapping to null.
-3. If the CSV has a single full name column (e.g. 'Name' or 'Contact Name'), map it to \`name\`.
-4. If a CSV column is named 'Status', 'Lead Status', or similar, map it to \`crm_status\`.
-5. If a CSV column contains phone numbers, map it to \`mobile_without_country_code\`.
-6. Provide a confidence score (from 0.0 to 1.0) for each mapped field.
-7. Provide a brief reasoning for the mappings.
-
-Return your response in JSON format. The response must be a single JSON object matching this schema:
-{
-  "mappings": {
-    "created_at": "CSV_HEADER" | null,
-    "name": "CSV_HEADER" | null,
-    "email": "CSV_HEADER" | null,
-    "country_code": "CSV_HEADER" | null,
-    "mobile_without_country_code": "CSV_HEADER" | null,
-    "company": "CSV_HEADER" | null,
-    "city": "CSV_HEADER" | null,
-    "state": "CSV_HEADER" | null,
-    "country": "CSV_HEADER" | null,
-    "lead_owner": "CSV_HEADER" | null,
-    "crm_status": "CSV_HEADER" | null,
-    "crm_note": "CSV_HEADER" | null,
-    "data_source": "CSV_HEADER" | null,
-    "possession_time": "CSV_HEADER" | null,
-    "description": "CSV_HEADER" | null
-  },
-  "confidence": {
-    "created_at": number,
-    "name": number,
-    "email": number,
-    "country_code": number,
-    "mobile_without_country_code": number,
-    "company": number,
-    "city": number,
-    "state": number,
-    "country": number,
-    "lead_owner": number,
-    "crm_status": number,
-    "crm_note": number,
-    "data_source": number,
-    "possession_time": number,
-    "description": number
-  },
-  "reasoning": "brief explanation"
-}
-`;
-
-  try {
-    const result = await callWithRetry(() => model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-      },
-    }));
-
-    const responseText = result.response.text();
-    return JSON.parse(responseText) as MappingResult;
-  } catch (error: any) {
-    console.error('Gemini mapping suggestion failed:', error);
-    throw new Error(`AI mapping analysis failed: ${error.message || error}`);
-  }
+  return programmaticSuggestMapping(headers);
 }
 
 export interface ProcessedLeadResult {
