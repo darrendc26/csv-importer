@@ -226,7 +226,8 @@ select {
 .table-scroll-container {
   overflow-x: auto;
   overflow-y: auto;
-  max-height: min(520px, calc(100vh - 290px));
+  max-height: min(580px, calc(100vh - 240px));
+  min-height: 360px; /* Guarantee space for at least 7-8 success rows at a time */
   border: 1px solid var(--border-color);
   border-radius: 0.5rem;
   position: relative;
