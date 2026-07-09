@@ -46,7 +46,7 @@ app.post('/api/analyze-headers', upload.single('csv'), async (req, res) => {
       }
       headers = parsed[0];
       allRows = parsed.slice(1);
-      sampleRows = allRows.slice(0, 5);
+      sampleRows = allRows.slice(0, 10);
     } else if (req.body.headers && Array.isArray(req.body.headers)) {
       headers = req.body.headers;
       sampleRows = req.body.sampleRows || [];
@@ -98,8 +98,8 @@ app.post('/api/import', async (req, res) => {
     // Count enrichment instances
     let enrichedFieldsCount = 0;
     successes.forEach(r => {
-      // If company was extracted/modified, or phone formatted, count as enriched
-      if (r.lead.company || r.lead.phone || r.lead.job_title || r.lead.estimated_value) {
+      // If company was extracted/modified, or location enriched, count as enriched
+      if (r.lead.company || r.lead.mobile_without_country_code || r.lead.city || r.lead.state) {
         enrichedFieldsCount++;
       }
     });

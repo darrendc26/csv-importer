@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Sparkles, AlertCircle, Check } from 'lucide-react';
+import { useVirtual } from '../hooks/useVirtual';
 
 interface PreviewTableProps {
   headers: string[];
@@ -13,15 +14,21 @@ interface PreviewTableProps {
 }
 
 const TARGET_FIELDS = [
-  { name: 'first_name', label: 'First Name', required: false, description: 'First name of the lead contact' },
-  { name: 'last_name', label: 'Last Name', required: false, description: 'Last name of the lead contact' },
-  { name: 'email', label: 'Email Address', required: true, description: 'Email address of the lead contact' },
-  { name: 'phone', label: 'Phone Number', required: false, description: 'Phone number of the lead contact' },
-  { name: 'company', label: 'Company Name', required: false, description: 'Name of the company/organization' },
-  { name: 'job_title', label: 'Job Title', required: false, description: 'Job position / title' },
-  { name: 'estimated_value', label: 'Estimated Value', required: false, description: 'Potential deal value (numeric)' },
-  { name: 'lead_status', label: 'Lead Status', required: false, description: 'Status: New, Contacted, Qualified, or Unqualified' },
-  { name: 'notes', label: 'Notes / Description', required: false, description: 'Additional details or other unmapped columns' },
+  { name: 'created_at', label: 'Created At', required: false, description: 'Lead creation date (JS parseable format)' },
+  { name: 'name', label: 'Name', required: false, description: 'Full name of the lead contact' },
+  { name: 'email', label: 'Email', required: false, description: 'Primary email address' },
+  { name: 'country_code', label: 'Country Code', required: false, description: 'Phone country code (e.g. +91)' },
+  { name: 'mobile_without_country_code', label: 'Mobile Number', required: false, description: 'Mobile number without country code' },
+  { name: 'company', label: 'Company', required: false, description: 'Company name' },
+  { name: 'city', label: 'City', required: false, description: 'City name' },
+  { name: 'state', label: 'State', required: false, description: 'State name' },
+  { name: 'country', label: 'Country', required: false, description: 'Country name' },
+  { name: 'lead_owner', label: 'Lead Owner', required: false, description: 'Email address of the lead owner' },
+  { name: 'crm_status', label: 'CRM Status', required: false, description: 'GOOD_LEAD_FOLLOW_UP, DID_NOT_CONNECT, BAD_LEAD, or SALE_DONE' },
+  { name: 'crm_note', label: 'CRM Note', required: false, description: 'Notes, remarks, extra phones/emails, or unmapped details' },
+  { name: 'data_source', label: 'Data Source', required: false, description: 'leads_on_demand, meridian_tower, eden_park, varah_swamy, sarjapur_plots' },
+  { name: 'possession_time', label: 'Possession Time', required: false, description: 'Property possession time' },
+  { name: 'description', label: 'Description', required: false, description: 'Additional description' },
 ];
 
 export default function PreviewTable({
@@ -36,6 +43,21 @@ export default function PreviewTable({
 }: PreviewTableProps) {
   const [mappings, setMappings] = useState<Record<string, string | null>>({});
   const [previewRows, setPreviewRows] = useState<any[]>([]);
+
+  const {
+    containerRef,
+    handleScroll,
+    startIndex,
+    endIndex,
+    totalHeight,
+    offsetY,
+  } = useVirtual({
+    totalCount: previewRows.length,
+    estimateRowHeight: 53,
+    buffer: 5,
+  });
+
+  const visibleRows = previewRows.slice(startIndex, endIndex + 1);
 
   // Initialize mappings with suggestions from Gemini
   useEffect(() => {
@@ -65,26 +87,14 @@ export default function PreviewTable({
 
       const lead: Record<string, any> = {};
 
-      // Name Splitting logic preview
-      const nameHeader = mappings['first_name'];
-      const lastNameHeader = mappings['last_name'];
+      TARGET_FIELDS.forEach((f) => {
+        lead[f.name] = mappings[f.name] ? rowObj[mappings[f.name]!] : '';
+      });
 
-      if (nameHeader && nameHeader === lastNameHeader) {
-        const fullName = (rowObj[nameHeader] || '').trim();
-        const parts = fullName.split(/\s+/);
-        lead['first_name'] = parts[0] || '';
-        lead['last_name'] = parts.slice(1).join(' ') || '';
-      } else {
-        lead['first_name'] = mappings['first_name'] ? rowObj[mappings['first_name']!] : '';
-        lead['last_name'] = mappings['last_name'] ? rowObj[mappings['last_name']!] : '';
+      // Default crm_status preview
+      if (!lead['crm_status']) {
+        lead['crm_status'] = 'GOOD_LEAD_FOLLOW_UP';
       }
-
-      lead['email'] = mappings['email'] ? rowObj[mappings['email']!] : '';
-      lead['phone'] = mappings['phone'] ? rowObj[mappings['phone']!] : '';
-      lead['company'] = mappings['company'] ? rowObj[mappings['company']!] : '';
-      lead['job_title'] = mappings['job_title'] ? rowObj[mappings['job_title']!] : '';
-      lead['estimated_value'] = mappings['estimated_value'] ? rowObj[mappings['estimated_value']!] : '';
-      lead['lead_status'] = mappings['lead_status'] ? rowObj[mappings['lead_status']!] : 'New';
 
       // Assemble extra notes on-the-fly
       const extraNotes: string[] = [];
@@ -93,8 +103,8 @@ export default function PreviewTable({
           extraNotes.push(`${h}: ${rowObj[h]}`);
         }
       });
-      const initialNotes = mappings['notes'] ? rowObj[mappings['notes']!] : '';
-      lead['notes'] = [initialNotes, ...extraNotes].filter(Boolean).join(' | ');
+      const initialNotes = mappings['crm_note'] ? rowObj[mappings['crm_note']!] : '';
+      lead['crm_note'] = [initialNotes, ...extraNotes].filter(Boolean).join(' | ');
 
       mapped.push(lead);
     }
@@ -109,7 +119,7 @@ export default function PreviewTable({
     }));
   };
 
-  const isEmailMapped = !!mappings['email'];
+  const isAtLeastOneContactFieldMapped = !!mappings['email'] || !!mappings['mobile_without_country_code'];
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -118,7 +128,7 @@ export default function PreviewTable({
       <div className="preview-grid">
         
         {/* Left Column: Field Mapper */}
-        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
+        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxHeight: 'calc(100vh - 290px)', overflowY: 'auto' }}>
           <div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.25rem' }}>Configure Mapping</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Map your CSV headers to the target CRM fields</p>
@@ -201,55 +211,77 @@ export default function PreviewTable({
           </div>
 
           {/* Live Grid */}
-          <div className="table-scroll-container" style={{ border: '1px solid var(--glass-border)' }}>
-            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.85rem', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ backgroundColor: 'rgba(255, 255, 255, 0.01)' }}>
-                  {TARGET_FIELDS.map((f) => (
-                    <th 
-                      key={f.name} 
-                      className="table-sticky-th"
-                      style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}
-                    >
-                      {f.label} {f.required && '*'}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {previewRows.map((row, idx) => (
-                  <tr key={idx}>
-                    {TARGET_FIELDS.map((f) => {
-                      const val = row[f.name];
-                      const isEmail = f.name === 'email';
-                      const isPlaceholder = !val;
-                      return (
-                        <td key={f.name} style={{ 
-                          padding: '1rem', 
-                          color: isPlaceholder ? 'var(--text-muted)' : 'var(--text-secondary)',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          maxWidth: '180px',
-                          borderBottom: '1px solid rgba(255,255,255,0.02)'
-                        }}>
-                          {isPlaceholder ? (
-                            <i>None</i>
-                          ) : isEmail ? (
-                            <span style={{ color: 'var(--accent-cyan)', textDecoration: 'underline' }}>{val}</span>
-                          ) : (
-                            val
-                          )}
-                        </td>
-                      );
-                    })}
+          <div 
+            ref={containerRef}
+            onScroll={handleScroll}
+            className="table-scroll-container" 
+            style={{ border: '1px solid var(--glass-border)' }}
+          >
+            <div style={{ height: `${totalHeight}px`, width: '100%', position: 'relative' }}>
+              <table 
+                style={{ 
+                  width: '100%', 
+                  borderCollapse: 'separate', 
+                  borderSpacing: 0, 
+                  fontSize: '0.85rem', 
+                  textAlign: 'left',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  transform: `translateY(${offsetY}px)`
+                }}
+              >
+                <thead>
+                  <tr style={{ backgroundColor: '#0f1524' }}>
+                    {TARGET_FIELDS.map((f) => (
+                      <th 
+                        key={f.name} 
+                        className="table-sticky-th"
+                        style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}
+                      >
+                         {f.name} {f.required && '*'}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {visibleRows.map((row, idx) => {
+                    const originalIdx = startIndex + idx;
+                    return (
+                      <tr key={originalIdx}>
+                        {TARGET_FIELDS.map((f) => {
+                          const val = row[f.name];
+                          const isEmail = f.name === 'email';
+                          const isPlaceholder = !val;
+                          return (
+                            <td key={f.name} style={{ 
+                              padding: '1rem', 
+                              color: isPlaceholder ? 'var(--text-muted)' : 'var(--text-secondary)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              maxWidth: '180px',
+                              borderBottom: '1px solid rgba(255,255,255,0.02)'
+                            }}>
+                              {isPlaceholder ? (
+                                <i>None</i>
+                              ) : isEmail ? (
+                                <span style={{ color: 'var(--accent-cyan)', textDecoration: 'underline' }}>{val}</span>
+                              ) : (
+                                val
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
           
-          {!isEmailMapped && (
+          {!isAtLeastOneContactFieldMapped && (
             <div
               className="fade-in"
               style={{
@@ -265,7 +297,7 @@ export default function PreviewTable({
               }}
             >
               <AlertCircle size={16} style={{ color: 'var(--danger)' }} />
-              <span>You must map the **Email Address** field (marked with *) before you can import leads.</span>
+              <span>You must map either **Email** or **Mobile Number** to avoid all records being skipped.</span>
             </div>
           )}
         </div>
@@ -293,7 +325,7 @@ export default function PreviewTable({
         <button 
           className="btn btn-primary glow-cyan" 
           onClick={() => onConfirm(mappings)} 
-          disabled={isLoading || !isEmailMapped}
+          disabled={isLoading || !isAtLeastOneContactFieldMapped}
         >
           {isLoading ? (
             <>

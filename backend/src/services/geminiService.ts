@@ -1,16 +1,22 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Target CRM Schema Fields
+// Target CRM Schema Fields (GrowEasy Assignment Specifications)
 export const TARGET_CRM_FIELDS = [
-  { name: 'first_name', label: 'First Name', required: false, description: 'First name of the lead contact' },
-  { name: 'last_name', label: 'Last Name', required: false, description: 'Last name of the lead contact' },
-  { name: 'email', label: 'Email Address', required: true, description: 'Email address of the lead contact' },
-  { name: 'phone', label: 'Phone Number', required: false, description: 'Phone number of the lead contact' },
-  { name: 'company', label: 'Company Name', required: false, description: 'Name of the company/organization' },
-  { name: 'job_title', label: 'Job Title', required: false, description: 'Job position / title' },
-  { name: 'estimated_value', label: 'Estimated Value', required: false, description: 'Potential deal value (numeric)' },
-  { name: 'lead_status', label: 'Lead Status', required: false, description: 'Status: New, Contacted, Qualified, or Unqualified' },
-  { name: 'notes', label: 'Notes / Description', required: false, description: 'Additional details or other unmapped columns' },
+  { name: 'created_at', label: 'Created At', required: false, description: 'Lead creation date (JS parseable format)' },
+  { name: 'name', label: 'Name', required: false, description: 'Full name of the lead contact' },
+  { name: 'email', label: 'Email', required: false, description: 'Primary email address' },
+  { name: 'country_code', label: 'Country Code', required: false, description: 'Phone country code (e.g. +91)' },
+  { name: 'mobile_without_country_code', label: 'Mobile Number', required: false, description: 'Mobile number without country code' },
+  { name: 'company', label: 'Company', required: false, description: 'Company/Organization name' },
+  { name: 'city', label: 'City', required: false, description: 'City name' },
+  { name: 'state', label: 'State', required: false, description: 'State name' },
+  { name: 'country', label: 'Country', required: false, description: 'Country name' },
+  { name: 'lead_owner', label: 'Lead Owner', required: false, description: 'Email address of the lead owner' },
+  { name: 'crm_status', label: 'CRM Status', required: false, description: 'Status: GOOD_LEAD_FOLLOW_UP, DID_NOT_CONNECT, BAD_LEAD, or SALE_DONE' },
+  { name: 'crm_note', label: 'CRM Note', required: false, description: 'Notes, remarks, comments, extra phones/emails, or unmapped details' },
+  { name: 'data_source', label: 'Data Source', required: false, description: 'Source: leads_on_demand, meridian_tower, eden_park, varah_swamy, sarjapur_plots' },
+  { name: 'possession_time', label: 'Possession Time', required: false, description: 'Property possession time' },
+  { name: 'description', label: 'Description', required: false, description: 'Additional description details' },
 ];
 
 function getModel(apiKey: string | undefined) {
@@ -21,6 +27,29 @@ function getModel(apiKey: string | undefined) {
   const genAI = new GoogleGenerativeAI(key);
   const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   return genAI.getGenerativeModel({ model: modelName });
+}
+
+export async function callWithRetry<T>(
+  fn: () => Promise<T>,
+  retries = 3,
+  delay = 1000
+): Promise<T> {
+  let attempt = 0;
+  let currentDelay = delay;
+  while (attempt < retries) {
+    try {
+      return await fn();
+    } catch (error) {
+      attempt++;
+      if (attempt >= retries) {
+        throw error;
+      }
+      console.warn(`Gemini API call failed (attempt ${attempt}/${retries}). Retrying in ${currentDelay}ms...`, error);
+      await new Promise((resolve) => setTimeout(resolve, currentDelay));
+      currentDelay *= 2; // Exponential backoff
+    }
+  }
+  throw new Error('Unexpected retry failure');
 }
 
 export interface MappingResult {
@@ -38,60 +67,73 @@ export async function suggestColumnMapping(
   const model = getModel(apiKey);
 
   const prompt = `
-You are an expert CRM Integration Assistant. You need to map columns from an uploaded CSV file to standard CRM lead schema fields.
+You are an expert CRM Integration Assistant. You need to map columns from an uploaded CSV file to standard GrowEasy CRM lead schema fields.
 
 Target CRM Fields:
-${TARGET_CRM_FIELDS.map(f => `- \`${f.name}\`: ${f.description} (${f.required ? 'REQUIRED' : 'OPTIONAL'})`).join('\n')}
+${TARGET_CRM_FIELDS.map(f => `- \`${f.name}\`: ${f.description}`).join('\n')}
 
 CSV Headers to map:
 ${JSON.stringify(headers)}
 
-CSV Sample Rows (up to 5 rows of data for context):
+CSV Sample Rows (up to 10 rows of data for context):
 ${JSON.stringify(sampleRows)}
 
 Instructions:
 1. Map each target CRM field to the most appropriate CSV header. A CSV header can only be mapped to one target CRM field.
 2. If there is no logical match for a CRM field, set the mapping to null.
-3. If the CSV has a single full name column (e.g. 'Name' or 'Contact Name'), map BOTH \`first_name\` and \`last_name\` to that same column name. The data parser will split them automatically.
-4. If a CSV column is named 'Status' or similar, map it to \`lead_status\`.
-5. Provide a confidence score (from 0.0 to 1.0) for each mapped field.
-6. Provide a brief reasoning for the mappings.
+3. If the CSV has a single full name column (e.g. 'Name' or 'Contact Name'), map it to \`name\`.
+4. If a CSV column is named 'Status', 'Lead Status', or similar, map it to \`crm_status\`.
+5. If a CSV column contains phone numbers, map it to \`mobile_without_country_code\`.
+6. Provide a confidence score (from 0.0 to 1.0) for each mapped field.
+7. Provide a brief reasoning for the mappings.
 
 Return your response in JSON format. The response must be a single JSON object matching this schema:
 {
   "mappings": {
-    "first_name": "CSV_HEADER" | null,
-    "last_name": "CSV_HEADER" | null,
+    "created_at": "CSV_HEADER" | null,
+    "name": "CSV_HEADER" | null,
     "email": "CSV_HEADER" | null,
-    "phone": "CSV_HEADER" | null,
+    "country_code": "CSV_HEADER" | null,
+    "mobile_without_country_code": "CSV_HEADER" | null,
     "company": "CSV_HEADER" | null,
-    "job_title": "CSV_HEADER" | null,
-    "estimated_value": "CSV_HEADER" | null,
-    "lead_status": "CSV_HEADER" | null,
-    "notes": "CSV_HEADER" | null
+    "city": "CSV_HEADER" | null,
+    "state": "CSV_HEADER" | null,
+    "country": "CSV_HEADER" | null,
+    "lead_owner": "CSV_HEADER" | null,
+    "crm_status": "CSV_HEADER" | null,
+    "crm_note": "CSV_HEADER" | null,
+    "data_source": "CSV_HEADER" | null,
+    "possession_time": "CSV_HEADER" | null,
+    "description": "CSV_HEADER" | null
   },
   "confidence": {
-    "first_name": number,
-    "last_name": number,
+    "created_at": number,
+    "name": number,
     "email": number,
-    "phone": number,
+    "country_code": number,
+    "mobile_without_country_code": number,
     "company": number,
-    "job_title": number,
-    "estimated_value": number,
-    "lead_status": number,
-    "notes": number
+    "city": number,
+    "state": number,
+    "country": number,
+    "lead_owner": number,
+    "crm_status": number,
+    "crm_note": number,
+    "data_source": number,
+    "possession_time": number,
+    "description": number
   },
   "reasoning": "brief explanation"
 }
 `;
 
   try {
-    const result = await model.generateContent({
+    const result = await callWithRetry(() => model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
         responseMimeType: 'application/json',
       },
-    });
+    }));
 
     const responseText = result.response.text();
     return JSON.parse(responseText) as MappingResult;
@@ -105,15 +147,21 @@ export interface ProcessedLeadResult {
   status: 'success' | 'skipped';
   reason: string | null;
   lead: {
-    first_name: string | null;
-    last_name: string | null;
+    created_at: string | null;
+    name: string | null;
     email: string | null;
-    phone: string | null;
+    country_code: string | null;
+    mobile_without_country_code: string | null;
     company: string | null;
-    job_title: string | null;
-    estimated_value: number | null;
-    lead_status: 'New' | 'Contacted' | 'Qualified' | 'Unqualified';
-    notes: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    lead_owner: string | null;
+    crm_status: 'GOOD_LEAD_FOLLOW_UP' | 'DID_NOT_CONNECT' | 'BAD_LEAD' | 'SALE_DONE' | null;
+    crm_note: string | null;
+    data_source: 'leads_on_demand' | 'meridian_tower' | 'eden_park' | 'varah_swamy' | 'sarjapur_plots' | null;
+    possession_time: string | null;
+    description: string | null;
   };
 }
 
@@ -126,7 +174,6 @@ function preMapRecords(
   const mappedCsvHeaders = new Set(Object.values(mapping).filter(Boolean));
 
   return rows.map((row) => {
-    // Convert row array to key-value object based on CSV headers
     const rowObj: Record<string, string> = {};
     headers.forEach((h, idx) => {
       rowObj[h] = row[idx] || '';
@@ -134,30 +181,11 @@ function preMapRecords(
 
     const lead: Record<string, any> = {};
 
-    // Handle full name splitting
-    const nameHeader = mapping['first_name'];
-    const lastNameHeader = mapping['last_name'];
+    TARGET_CRM_FIELDS.forEach((field) => {
+      lead[field.name] = mapping[field.name] ? rowObj[mapping[field.name]!] : '';
+    });
 
-    if (nameHeader && nameHeader === lastNameHeader) {
-      // Split full name
-      const fullName = (rowObj[nameHeader] || '').trim();
-      const parts = fullName.split(/\s+/);
-      lead['first_name'] = parts[0] || '';
-      lead['last_name'] = parts.slice(1).join(' ') || '';
-    } else {
-      lead['first_name'] = mapping['first_name'] ? rowObj[mapping['first_name']!] : '';
-      lead['last_name'] = mapping['last_name'] ? rowObj[mapping['last_name']!] : '';
-    }
-
-    // Map other standard fields
-    lead['email'] = mapping['email'] ? rowObj[mapping['email']!] : '';
-    lead['phone'] = mapping['phone'] ? rowObj[mapping['phone']!] : '';
-    lead['company'] = mapping['company'] ? rowObj[mapping['company']!] : '';
-    lead['job_title'] = mapping['job_title'] ? rowObj[mapping['job_title']!] : '';
-    lead['estimated_value'] = mapping['estimated_value'] ? rowObj[mapping['estimated_value']!] : '';
-    lead['lead_status'] = mapping['lead_status'] ? rowObj[mapping['lead_status']!] : '';
-    
-    // Aggregate unmapped columns to append to notes
+    // Aggregate any unmapped columns to crm_note
     const extraNotes: string[] = [];
     headers.forEach((h) => {
       if (!mappedCsvHeaders.has(h) && rowObj[h]) {
@@ -165,8 +193,8 @@ function preMapRecords(
       }
     });
 
-    const initialNotes = mapping['notes'] ? rowObj[mapping['notes']!] : '';
-    lead['notes'] = [initialNotes, ...extraNotes].filter(Boolean).join(' | ');
+    const initialNote = lead['crm_note'] || '';
+    lead['crm_note'] = [initialNote, ...extraNotes].filter(Boolean).join(' | ');
 
     return lead;
   });
@@ -183,29 +211,38 @@ export async function cleanAndValidateLeads(
   const model = getModel(apiKey);
   const results: ProcessedLeadResult[] = [];
   
-  // Batch size: 30 leads per request
   const batchSize = 30;
 
   for (let i = 0; i < initialLeads.length; i += batchSize) {
     const batch = initialLeads.slice(i, i + batchSize);
     
     const prompt = `
-You are an expert CRM Data Quality Engine. Your task is to clean, standardize, validate, and enrich the following batch of lead records.
+You are an expert CRM Data Quality Engine. Your task is to clean, standardize, validate, and enrich the following batch of lead records according to the GrowEasy CRM rules.
 
-Formatting Rules for CRM Fields:
-- \`first_name\`: Format to Title Case (e.g. 'john' -> 'John').
-- \`last_name\`: Format to Title Case (e.g. 'DOE' -> 'Doe').
-- \`email\`: Validate the email format. If missing or completely invalid (doesn't contain '@' or a valid domain), mark \`status\` as 'skipped' and explain in \`reason\`.
-- \`phone\`: Standardize to a clean telephone format (e.g. '+1 (555) 019-2834' or '+44 20 7946 0958' or E.164 format).
-- \`company\`: Standardize names (e.g. 'Google Inc.' -> 'Google'). If missing, look at the email domain (if it's not a public provider like gmail.com, yahoo.com, outlook.com, hotmail.com, etc.) and suggest a company name (e.g. 'sarah@stripe.com' -> Company 'Stripe').
-- \`job_title\`: Normalize common job titles (e.g. 'vp of sales' -> 'Vice President of Sales', 'software engineer II' -> 'Software Engineer').
-- \`estimated_value\`: Clean and parse into a numeric value. Convert text like '$5,000', '10k', '500.50' to numbers (5000, 10000, 500.5). If empty or unparseable, set to null.
-- \`lead_status\`: Normalize to one of the following exact string values: 'New', 'Contacted', 'Qualified', 'Unqualified'. Default to 'New' if not specified or empty.
-- \`notes\`: Clean up whitespace and retain notes.
+Formatting and Cleaning Rules:
+1. \`name\`: Standardize to Title Case (e.g. 'john doe' -> 'John Doe').
+2. \`created_at\`: Format as a JavaScript-parseable date string (e.g. 'YYYY-MM-DD HH:MM:SS'). Default to current date/time if missing or empty.
+3. \`email\`: Validate format. If multiple emails exist, put the first in \`email\` and append any remaining emails to \`crm_note\`.
+4. \`country_code\`: Standardize to a plus sign followed by numeric code (e.g. '+91' or '+1'). If missing, look at other fields or phone values to infer, otherwise default to '+91' or leave blank.
+5. \`mobile_without_country_code\`: Clean the number (remove spaces, symbols, and country codes if present). If multiple numbers exist, put the first in \`mobile_without_country_code\` and append any remaining numbers to \`crm_note\`.
+6. \`company\`: Clean names. If missing, look at the email domain (excluding public providers like gmail, yahoo, outlook, hotmail, mail, icloud) to infer and enrich the company field (e.g., 'sarah@stripe.com' -> Company 'Stripe').
+7. \`crm_status\`: Normalize to ONE of these exact values:
+   - GOOD_LEAD_FOLLOW_UP
+   - DID_NOT_CONNECT
+   - BAD_LEAD
+   - SALE_DONE
+   Default to GOOD_LEAD_FOLLOW_UP if empty or unmapped.
+8. \`data_source\`: Normalize to ONE of these exact values:
+   - leads_on_demand
+   - meridian_tower
+   - eden_park
+   - varah_swamy
+   - sarjapur_plots
+   If none match confidently, set to null/empty string.
+9. \`crm_note\`: Retain notes, and append any extra phone numbers, extra email addresses, or unmapped details here. Escaped newlines (\\n) are allowed, but do not output actual carriage returns or unescaped newlines to maintain CSV compatibility.
 
-Validation Criteria:
-1. Email is required. If a record has an empty email, it MUST be marked with status 'skipped' and reason 'Missing email address'.
-2. Email must contain '@'. If invalid, status is 'skipped' and reason 'Invalid email format'.
+Validation / Skip Criteria:
+- If a record has NEITHER a valid \`email\` nor a valid mobile number (\`mobile_without_country_code\`), it MUST be marked with status 'skipped' and the appropriate explanation in \`reason\`. Otherwise, mark status as 'success'.
 
 Input batch of lead records to process:
 ${JSON.stringify(batch)}
@@ -218,15 +255,21 @@ Schema for the output:
       "status": "success" | "skipped",
       "reason": "validation error message or null",
       "lead": {
-        "first_name": string | null,
-        "last_name": string | null,
+        "created_at": string | null,
+        "name": string | null,
         "email": string | null,
-        "phone": string | null,
+        "country_code": string | null,
+        "mobile_without_country_code": string | null,
         "company": string | null,
-        "job_title": string | null,
-        "estimated_value": number | null,
-        "lead_status": "New" | "Contacted" | "Qualified" | "Unqualified",
-        "notes": string | null
+        "city": string | null,
+        "state": string | null,
+        "country": string | null,
+        "lead_owner": string | null,
+        "crm_status": "GOOD_LEAD_FOLLOW_UP" | "DID_NOT_CONNECT" | "BAD_LEAD" | "SALE_DONE" | null,
+        "crm_note": string | null,
+        "data_source": "leads_on_demand" | "meridian_tower" | "eden_park" | "varah_swamy" | "sarjapur_plots" | null,
+        "possession_time": string | null,
+        "description": string | null
       }
     }
   ]
@@ -234,42 +277,114 @@ Schema for the output:
 `;
 
     try {
-      const result = await model.generateContent({
+      const result = await callWithRetry(() => model.generateContent({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: 'application/json',
         },
-      });
+      }));
 
       const responseText = result.response.text();
       const parsed = JSON.parse(responseText);
       
       if (parsed && Array.isArray(parsed.processed_leads)) {
+        parsed.processed_leads.forEach((r: any) => {
+          if (r.lead) {
+            // If created_at was not mapped from the CSV, stamp it with the current date/time.
+            // Otherwise, validate the mapped date.
+            if (!mapping['created_at']) {
+              r.lead.created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            } else {
+              const dateVal = r.lead.created_at;
+              if (!dateVal || isNaN(Date.parse(dateVal))) {
+                r.lead.created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+              }
+            }
+
+            // Post-AI Safety Rule: If it actually has neither email nor mobile, force it to 'skipped'
+            const email = String(r.lead.email || '').trim();
+            const mobile = String(r.lead.mobile_without_country_code || '').trim();
+            const hasEmail = email.includes('@');
+            const hasMobile = mobile.length >= 7;
+
+            if (!hasEmail && !hasMobile) {
+              r.status = 'skipped';
+              r.reason = 'Missing both email and mobile number (Post-AI Enforced)';
+            }
+          }
+        });
         results.push(...parsed.processed_leads);
       } else {
         throw new Error('Invalid JSON structure returned from AI model.');
       }
     } catch (error: any) {
       console.error(`Error processing batch starting at index ${i}:`, error);
-      // Fallback: If AI fails for a batch, programmatically create fallback objects so we do not fail the whole import
+      
+      // Fallback: Programmatic backup parser when AI fails
       batch.forEach((lead) => {
-        const val = parseFloat(String(lead.estimated_value).replace(/[^0-9.]/g, ''));
-        const email = String(lead.email).trim();
-        const hasEmail = email.includes('@');
+        const rawEmail = String(lead.email || '').trim();
+        const rawMobile = String(lead.mobile_without_country_code || '').trim();
         
+        // Skip logic: Neither email nor phone
+        const hasEmail = rawEmail.includes('@');
+        const hasMobile = rawMobile.length >= 7; // Basic numeric length check
+
+        let status: 'success' | 'skipped' = 'success';
+        let reason: string | null = null;
+
+        if (!hasEmail && !hasMobile) {
+          status = 'skipped';
+          reason = 'Missing both email and mobile number (AI Fallback)';
+        }
+
+        // Clean names
+        const cleanName = lead.name ? String(lead.name).trim().replace(/\b\w/g, c => c.toUpperCase()) : null;
+
+        // Date check
+        let createdAt = lead.created_at ? String(lead.created_at).trim() : null;
+        if (!createdAt) {
+          createdAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        }
+
+        // Handle first email / first mobile
+        const emailParts = rawEmail.split(/[\s,;]+/);
+        const email = emailParts[0] || null;
+        const extraEmails = emailParts.slice(1);
+
+        const cleanMobile = rawMobile.replace(/[^0-9]/g, '');
+        const extraMobiles: string[] = [];
+        // Extract country code if starts with +
+        let cc = lead.country_code ? String(lead.country_code).trim() : '';
+        if (!cc && rawMobile.startsWith('+')) {
+          cc = rawMobile.split(' ')[0] || '';
+        }
+        if (!cc) cc = '+91'; // default country code for India per assignments
+
+        // Notes formatting
+        const notesList = [lead.crm_note];
+        if (extraEmails.length > 0) notesList.push(`Extra Emails: ${extraEmails.join(', ')}`);
+        if (extraMobiles.length > 0) notesList.push(`Extra Mobiles: ${extraMobiles.join(', ')}`);
+        const finalNotes = notesList.filter(Boolean).join(' | ');
+
         results.push({
-          status: hasEmail ? 'success' : 'skipped',
-          reason: hasEmail ? null : (email ? 'Invalid email format (AI Fallback)' : 'Missing email address (AI Fallback)'),
+          status,
+          reason,
           lead: {
-            first_name: lead.first_name ? String(lead.first_name).trim() : null,
-            last_name: lead.last_name ? String(lead.last_name).trim() : null,
+            created_at: createdAt,
+            name: cleanName || null,
             email: email || null,
-            phone: lead.phone ? String(lead.phone).trim() : null,
+            country_code: cc || null,
+            mobile_without_country_code: cleanMobile || null,
             company: lead.company ? String(lead.company).trim() : null,
-            job_title: lead.job_title ? String(lead.job_title).trim() : null,
-            estimated_value: isNaN(val) ? null : val,
-            lead_status: 'New',
-            notes: lead.notes || null,
+            city: lead.city ? String(lead.city).trim() : null,
+            state: lead.state ? String(lead.state).trim() : null,
+            country: lead.country ? String(lead.country).trim() : null,
+            lead_owner: lead.lead_owner ? String(lead.lead_owner).trim() : null,
+            crm_status: lead.crm_status || 'GOOD_LEAD_FOLLOW_UP',
+            crm_note: finalNotes || null,
+            data_source: lead.data_source || null,
+            possession_time: lead.possession_time ? String(lead.possession_time).trim() : null,
+            description: lead.description ? String(lead.description).trim() : null,
           },
         });
       });
@@ -283,4 +398,3 @@ Schema for the output:
 export async function mapLeadRecordsWithGemini(records: any[]): Promise<any> {
   return [];
 }
-

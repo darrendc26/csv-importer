@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { RotateCcw, Download, Search, CheckCircle, XCircle, Activity, FileJson, FileSpreadsheet } from 'lucide-react';
+import { useVirtual } from '../hooks/useVirtual';
 
 interface ResultTableProps {
   result: {
@@ -13,15 +14,21 @@ interface ResultTableProps {
       status: 'success' | 'skipped';
       reason: string | null;
       lead: {
-        first_name: string | null;
-        last_name: string | null;
+        created_at: string | null;
+        name: string | null;
         email: string | null;
-        phone: string | null;
+        country_code: string | null;
+        mobile_without_country_code: string | null;
         company: string | null;
-        job_title: string | null;
-        estimated_value: number | null;
-        lead_status: 'New' | 'Contacted' | 'Qualified' | 'Unqualified';
-        notes: string | null;
+        city: string | null;
+        state: string | null;
+        country: string | null;
+        lead_owner: string | null;
+        crm_status: string | null;
+        crm_note: string | null;
+        data_source: string | null;
+        possession_time: string | null;
+        description: string | null;
       };
     }>;
   } | null;
@@ -29,15 +36,21 @@ interface ResultTableProps {
 }
 
 const CRM_FIELDS_FOR_CSV = [
-  'first_name',
-  'last_name',
+  'created_at',
+  'name',
   'email',
-  'phone',
+  'country_code',
+  'mobile_without_country_code',
   'company',
-  'job_title',
-  'estimated_value',
-  'lead_status',
-  'notes'
+  'city',
+  'state',
+  'country',
+  'lead_owner',
+  'crm_status',
+  'crm_note',
+  'data_source',
+  'possession_time',
+  'description'
 ];
 
 export default function ResultTable({ result, onReset }: ResultTableProps) {
@@ -56,19 +69,35 @@ export default function ResultTable({ result, onReset }: ResultTableProps) {
 
   // Filter successful leads by search query
   const filteredSuccessLeads = successfulLeads.filter((lead) => {
-    const fullName = `${lead.first_name || ''} ${lead.last_name || ''}`.toLowerCase();
+    const fullName = (lead.name || '').toLowerCase();
     const email = (lead.email || '').toLowerCase();
     const company = (lead.company || '').toLowerCase();
-    const jobTitle = (lead.job_title || '').toLowerCase();
+    const city = (lead.city || '').toLowerCase();
     const query = searchQuery.toLowerCase();
 
     return (
       fullName.includes(query) ||
       email.includes(query) ||
       company.includes(query) ||
-      jobTitle.includes(query)
+      city.includes(query)
     );
   });
+
+  // Virtualization hooks
+  const successVirtual = useVirtual({
+    totalCount: filteredSuccessLeads.length,
+    estimateRowHeight: 45,
+    buffer: 5,
+  });
+
+  const skippedVirtual = useVirtual({
+    totalCount: skippedRecords.length,
+    estimateRowHeight: 45,
+    buffer: 5,
+  });
+
+  const visibleSuccessLeads = filteredSuccessLeads.slice(successVirtual.startIndex, successVirtual.endIndex + 1);
+  const visibleSkippedRecords = skippedRecords.slice(skippedVirtual.startIndex, skippedVirtual.endIndex + 1);
 
   const triggerCSVDownload = (data: any[], headers: string[], filename: string) => {
     const csvRows: string[] = [];
@@ -272,76 +301,117 @@ export default function ResultTable({ result, onReset }: ResultTableProps) {
                 No imported leads found matching search.
               </div>
             ) : (
-              <div className="table-scroll-container">
-                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.85rem', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: 'rgba(255, 255, 255, 0.01)' }}>
-                      <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Name</th>
-                      <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Email</th>
-                      <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Phone</th>
-                      <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Company</th>
-                      <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Job Title</th>
-                      <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Est. Value</th>
-                      <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Status</th>
-                      <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredSuccessLeads.map((lead, idx) => (
-                      <tr key={idx}>
-                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-primary)', fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                          {[lead.first_name, lead.last_name].filter(Boolean).join(' ') || <i>Unnamed</i>}
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', color: 'var(--accent-cyan)', textDecoration: 'underline', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.email}</td>
-                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.phone || <i>None</i>}</td>
-                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.company || <i>None</i>}</td>
-                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.job_title || <i>None</i>}</td>
-                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                          {lead.estimated_value !== null ? `$${lead.estimated_value.toLocaleString()}` : <i>None</i>}
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                          <span
-                            style={{
-                              fontSize: '0.75rem',
-                              padding: '0.15rem 0.5rem',
-                              borderRadius: '0.25rem',
-                              fontWeight: 600,
-                              backgroundColor:
-                                lead.lead_status === 'Qualified'
-                                  ? 'rgba(16, 185, 129, 0.1)'
-                                  : lead.lead_status === 'Contacted'
-                                  ? 'rgba(6, 182, 212, 0.1)'
-                                  : lead.lead_status === 'Unqualified'
-                                  ? 'rgba(239, 68, 68, 0.1)'
-                                  : 'rgba(245, 158, 11, 0.1)',
-                              color:
-                                lead.lead_status === 'Qualified'
-                                  ? 'var(--success)'
-                                  : lead.lead_status === 'Contacted'
-                                  ? 'var(--accent-cyan)'
-                                  : lead.lead_status === 'Unqualified'
-                                  ? 'var(--danger)'
-                                  : 'var(--warning)',
-                            }}
-                          >
-                            {lead.lead_status}
-                          </span>
-                        </td>
-                        <td style={{ 
-                          padding: '0.75rem 1rem', 
-                          color: 'var(--text-muted)',
-                          maxWidth: '200px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          borderBottom: '1px solid rgba(255,255,255,0.02)'
-                        }} title={lead.notes || ''}>
-                          {lead.notes || <i>No notes</i>}
-                        </td>
+              <div 
+                ref={successVirtual.containerRef}
+                onScroll={successVirtual.handleScroll}
+                className="table-scroll-container"
+              >
+                <div style={{ height: `${successVirtual.totalHeight}px`, width: '100%', position: 'relative' }}>
+                  <table 
+                    style={{ 
+                      width: '100%', 
+                      borderCollapse: 'separate', 
+                      borderSpacing: 0, 
+                      fontSize: '0.85rem', 
+                      textAlign: 'left',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      transform: `translateY(${successVirtual.offsetY}px)`
+                    }}
+                  >
+                    <thead>
+                      <tr style={{ backgroundColor: '#0f1524' }}>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>created_at</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>name</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>email</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>country_code</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>mobile_without_country_code</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>company</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>city</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>state</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>country</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>lead_owner</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>crm_status</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>crm_note</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>data_source</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>possession_time</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>description</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {visibleSuccessLeads.map((lead, idx) => {
+                        const originalIdx = successVirtual.startIndex + idx;
+                        return (
+                          <tr key={originalIdx}>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.created_at || <i>None</i>}</td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-primary)', fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.name || <i>Unnamed</i>}</td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--accent-cyan)', textDecoration: 'underline', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.email || <i>None</i>}</td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.country_code || <i>None</i>}</td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.mobile_without_country_code || <i>None</i>}</td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.company || <i>None</i>}</td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.city || <i>None</i>}</td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.state || <i>None</i>}</td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.country || <i>None</i>}</td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.lead_owner || <i>None</i>}</td>
+                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                              <span
+                                style={{
+                                  fontSize: '0.75rem',
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: '0.25rem',
+                                  fontWeight: 600,
+                                  backgroundColor:
+                                    lead.crm_status === 'SALE_DONE'
+                                      ? 'rgba(16, 185, 129, 0.1)'
+                                      : lead.crm_status === 'GOOD_LEAD_FOLLOW_UP'
+                                      ? 'rgba(6, 182, 212, 0.1)'
+                                      : lead.crm_status === 'BAD_LEAD'
+                                      ? 'rgba(239, 68, 68, 0.1)'
+                                      : 'rgba(245, 158, 11, 0.1)',
+                                  color:
+                                    lead.crm_status === 'SALE_DONE'
+                                      ? 'var(--success)'
+                                      : lead.crm_status === 'GOOD_LEAD_FOLLOW_UP'
+                                      ? 'var(--accent-cyan)'
+                                      : lead.crm_status === 'BAD_LEAD'
+                                      ? 'var(--danger)'
+                                      : 'var(--warning)',
+                                }}
+                              >
+                                {lead.crm_status || 'GOOD_LEAD_FOLLOW_UP'}
+                              </span>
+                            </td>
+                            <td style={{ 
+                              padding: '0.75rem 1rem', 
+                              color: 'var(--text-muted)',
+                              maxWidth: '180px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              borderBottom: '1px solid rgba(255,255,255,0.02)'
+                            }} title={lead.crm_note || ''}>
+                              {lead.crm_note || <i>No notes</i>}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.data_source || <i>None</i>}</td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{lead.possession_time || <i>None</i>}</td>
+                            <td style={{ 
+                              padding: '0.75rem 1rem', 
+                              color: 'var(--text-muted)',
+                              maxWidth: '180px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              borderBottom: '1px solid rgba(255,255,255,0.02)'
+                            }} title={lead.description || ''}>
+                              {lead.description || <i>No description</i>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -355,46 +425,69 @@ export default function ResultTable({ result, onReset }: ResultTableProps) {
                 No records skipped. All leads imported successfully!
               </div>
             ) : (
-              <div className="table-scroll-container">
-                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.85rem', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: 'rgba(255, 255, 255, 0.01)' }}>
-                      <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--danger)' }}>Validation Error</th>
-                      <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Raw Email</th>
-                      <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Raw Name</th>
-                      <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Raw Company</th>
-                      <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Extra Raw Details</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {skippedRecords.map((item, idx) => (
-                      <tr key={idx}>
-                        <td style={{ padding: '0.75rem 1rem', color: '#f87171', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <XCircle size={14} />
-                            <span>{item.reason || 'Validation Failed'}</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{item.lead.email || <i>Empty</i>}</td>
-                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                          {[item.lead.first_name, item.lead.last_name].filter(Boolean).join(' ') || <i>Empty</i>}
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{item.lead.company || <i>Empty</i>}</td>
-                        <td style={{ 
-                          padding: '0.75rem 1rem', 
-                          color: 'var(--text-muted)',
-                          maxWidth: '250px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          borderBottom: '1px solid rgba(255,255,255,0.02)'
-                        }} title={item.lead.notes || ''}>
-                          {item.lead.notes || <i>None</i>}
-                        </td>
+              <div 
+                ref={skippedVirtual.containerRef}
+                onScroll={skippedVirtual.handleScroll}
+                className="table-scroll-container"
+              >
+                <div style={{ height: `${skippedVirtual.totalHeight}px`, width: '100%', position: 'relative' }}>
+                  <table 
+                    style={{ 
+                      width: '100%', 
+                      borderCollapse: 'separate', 
+                      borderSpacing: 0, 
+                      fontSize: '0.85rem', 
+                      textAlign: 'left',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      transform: `translateY(${skippedVirtual.offsetY}px)`
+                    }}
+                  >
+                    <thead>
+                      <tr style={{ backgroundColor: '#0f1524' }}>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--danger)' }}>Validation Error</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Raw Name</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Raw Email</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Raw Mobile</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Raw Company</th>
+                        <th className="table-sticky-th" style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Raw Details</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {visibleSkippedRecords.map((item, idx) => {
+                        const originalIdx = skippedVirtual.startIndex + idx;
+                        return (
+                          <tr key={originalIdx}>
+                            <td style={{ padding: '0.75rem 1rem', color: '#f87171', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <XCircle size={14} />
+                                <span>{item.reason || 'Validation Failed'}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{item.lead.name || <i>Empty</i>}</td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{item.lead.email || <i>Empty</i>}</td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                              {item.lead.mobile_without_country_code ? `${item.lead.country_code || ''} ${item.lead.mobile_without_country_code}` : <i>Empty</i>}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>{item.lead.company || <i>Empty</i>}</td>
+                            <td style={{ 
+                              padding: '0.75rem 1rem', 
+                              color: 'var(--text-muted)',
+                              maxWidth: '250px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              borderBottom: '1px solid rgba(255,255,255,0.02)'
+                            }} title={item.lead.crm_note || ''}>
+                              {item.lead.crm_note || <i>None</i>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>

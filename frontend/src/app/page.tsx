@@ -79,7 +79,7 @@ export default function Home() {
   };
 
   return (
-    <main style={{ padding: '2rem 1.5rem', maxWidth: '1200px', margin: '0 auto', minHeight: '100vh', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <main style={{ padding: '1.5rem 2rem', width: '100%', maxWidth: '100%', minHeight: '100vh', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
       {/* Top Navbar */}
       <header style={{ 

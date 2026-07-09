@@ -1,6 +1,6 @@
-// Utility to parse raw CSV content into JavaScript objects (array of row arrays)
-export function parseCSV(csvContent: string): string[][] {
-  const result: string[][] = [];
+// Utility to parse raw CSV content incrementally using a generator.
+// This prevents high memory overhead when reading large datasets.
+export function* parseCSVGenerator(csvContent: string): Generator<string[]> {
   let row: string[] = [];
   let currentVal = '';
   let inQuotes = false;
@@ -32,9 +32,9 @@ export function parseCSV(csvContent: string): string[][] {
         row.push(currentVal.trim());
         currentVal = '';
         
-        // Add row if it contains at least one non-empty value
+        // Yield row if it contains at least one non-empty value
         if (row.some(val => val !== '')) {
-          result.push(row);
+          yield row;
         }
         row = [];
         if (char === '\r' && nextChar === '\n') {
@@ -50,10 +50,17 @@ export function parseCSV(csvContent: string): string[][] {
   if (currentVal !== '' || row.length > 0) {
     row.push(currentVal.trim());
     if (row.some(val => val !== '')) {
-      result.push(row);
+      yield row;
     }
   }
-
-  return result;
 }
 
+// Wrapper parser that collects all generated rows into a single array
+// for compatibility with current endpoints.
+export function parseCSV(csvContent: string): string[][] {
+  const result: string[][] = [];
+  for (const row of parseCSVGenerator(csvContent)) {
+    result.push(row);
+  }
+  return result;
+}

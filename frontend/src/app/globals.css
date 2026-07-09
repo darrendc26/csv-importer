@@ -211,8 +211,8 @@ select {
 /* Responsive Grid for Preview Table */
 .preview-grid {
   display: grid;
-  grid-template-columns: 400px 1fr;
-  gap: 2rem;
+  grid-template-columns: 320px 1fr;
+  gap: 1.5rem;
   align-items: start;
 }
 
@@ -226,7 +226,7 @@ select {
 .table-scroll-container {
   overflow-x: auto;
   overflow-y: auto;
-  max-height: 320px;
+  max-height: min(520px, calc(100vh - 290px));
   border: 1px solid var(--border-color);
   border-radius: 0.5rem;
   position: relative;

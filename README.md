@@ -100,8 +100,17 @@ Open `http://localhost:3001` in your browser.
 ---
 
 ## Testing with Sample Leads
-You can use the provided [sample_leads.csv](sample_leads.csv) file to test the importer. It is preloaded with 10 diverse records designed to test the mapping, validation, and enrichment engines:
-*   Standard records with complete details.
-*   Leads with missing company names but corporate email domains to test AI enrichment.
-*   Leads with messy telephone formats and estimated value expressions (e.g. `10k`, `$2,500`, `1M`).
-*   Intentionally broken records to test skipped validation (e.g., missing emails, invalid email formats).
+We have provided two sample files in the root folder to help you test the importer:
+
+1. **[groweasy_sample_leads.csv](groweasy_sample_leads.csv) (Official CRM Schema)**:
+   Contains the exact 15 standard CRM columns and the 4 sample records from the assignment. All headers map 1:1 instantly with 100% confidence.
+
+2. **[sample_leads.csv](sample_leads.csv) (Messy/Arbitrary Schema)**:
+   Contains 10 records with different layouts (e.g. `Full Name`, `E-mail Address`, `EstValue`, `Comments`) to test the AI's ability to map, clean, and enrich records (e.g., extracting values, inferring company names from email domains, and appending unmapped columns to `crm_note`).
+
+### Enforced Rules
+*   **Allowed CRM Statuses:** Only `GOOD_LEAD_FOLLOW_UP`, `DID_NOT_CONNECT`, `BAD_LEAD`, and `SALE_DONE`.
+*   **Allowed Data Sources:** `leads_on_demand`, `meridian_tower`, `eden_park`, `varah_swamy`, `sarjapur_plots` (or left blank).
+*   **Skip Criteria:** Any record with neither a valid email nor a valid mobile number is automatically skipped.
+*   **Multi-value Processing:** The first email/mobile goes to its field; any subsequent values are appended to `crm_note`.
+*   **Date Format:** `created_at` is cleaned and validated to a JS-parseable string format (`YYYY-MM-DD HH:MM:SS`). If missing/unmapped, it is programmatically stamped with the current import time.
